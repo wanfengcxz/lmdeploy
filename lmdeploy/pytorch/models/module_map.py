@@ -424,3 +424,14 @@ ASCEND_MODULE_MAP.update({
     'transformers.models.qwen2_moe.modeling_qwen2_moe.Qwen2MoeSparseMoeBlock':
     f'{LMDEPLOY_PYTORCH_MODEL_PATH}.qwen2_moe.PatchedQwen2MoeSparseMoeBlockAscend',  # noqa: E501
 })
+
+# camb module
+CAMB_MODULE_MAP = dict()
+
+DEVICE_SPECIAL_MODULE_MAP.update({'camb': CAMB_MODULE_MAP})
+
+# camb internlm2
+CAMB_MODULE_MAP.update({
+    'modeling_internlm2.InternLM2Attention':
+    f'{LMDEPLOY_PYTORCH_MODEL_PATH}.internlm2.PatchedInternLM2AttentionCamb',
+})
