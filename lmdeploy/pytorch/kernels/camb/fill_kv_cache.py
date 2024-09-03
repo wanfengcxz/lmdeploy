@@ -29,4 +29,31 @@ def fill_kv_cache(
     #    key_caches = key_caches.reshape(key_caches.shape[0],key_caches.shape[2],key_caches.shape[1],key_caches.shape[3])
     #    value_caches = value_caches.reshape(value_caches.shape[0],value_caches.shape[2],value_caches.shape[1],value_caches.shape[3])
     #print("kc after:",key_caches.shape)
-    ext_ops.fill_kv_cache(key_states, value_states, key_caches.view(value_caches.shape[0],value_caches.shape[2],value_caches.shape[1],value_caches.shape[3]), value_caches.view(value_caches.shape[0],value_caches.shape[2],value_caches.shape[1],value_caches.shape[3]), context.kv_start_indices.view(context.kv_start_indices.shape[0]))
+    
+    block_num, block_size, head_num, head_dim = key_caches.shape    # torch.Size([1644, 64, 8, 128])
+    print(f"[fill_kv_cache, k_cache shape]: {key_caches.shape}")
+    print(f"[fill_kv_cache, k_index]: {context.kv_start_indices.flatten()}")  # torch.Size([9, 1])    torch.Size([1, 1])
+    print(f"[fill_kv_cache, k]: {key_states[0, 0, 0:100:10].cpu()}  {key_states.abs().mean().cpu()}")
+
+    # key_cache_reshaped = key_caches.permute(0, 2, 1, 3).contiguous()
+    # value_cache_reshaped = value_caches.permute(0, 2, 1, 3).contiguous()
+    key_cache_reshaped = key_caches.view(key_caches.shape[0],key_caches.shape[2],key_caches.shape[1],key_caches.shape[3])
+    value_cache_reshaped = value_caches.view(value_caches.shape[0],value_caches.shape[2],value_caches.shape[1],value_caches.shape[3])
+    ext_ops.fill_kv_cache(key_states, value_states, key_cache_reshaped, value_cache_reshaped, context.kv_start_indices.view(context.kv_start_indices.shape[0]))
+   #  bt_ops.reshape_paged_cache(key, value, key_cache_reshaped, value_cache_reshaped, kv_indices)
+    # key_caches[...] = key_cache_reshaped.permute(0, 2, 1, 3).contiguous()
+    # value_caches[...] = value_cache_reshaped.permute(0, 2, 1, 3).contiguous()
+    
+    if context.kv_start_indices.shape[0] != 1:
+        # prefill
+        print(f"[after fill_kv_cache, k_cache]: {key_caches[0, 0, 0, 0:100:10].cpu()}  {key_caches.abs().mean().cpu()}")
+    else:
+        # decoder
+        k_idx = context.kv_start_indices[0][0]
+        block_id = k_idx // block_size
+        block_offset = k_idx % block_size
+        print(f"[after fill_kv_cache, k_cache]: {key_caches[block_id, block_offset, 0, 0:100:10].cpu()}  {key_caches.abs().mean().cpu()}")
+
+
+    # ext_ops.fill_kv_cache(key_states, value_states, key_caches, value_caches, context.kv_start_indices.view(context.kv_start_indices.shape[0]))
+    # ext_ops.fill_kv_cache(key_states, value_states, key_caches.view(value_caches.shape[0],value_caches.shape[2],value_caches.shape[1],value_caches.shape[3]), value_caches.view(value_caches.shape[0],value_caches.shape[2],value_caches.shape[1],value_caches.shape[3]), context.kv_start_indices.view(context.kv_start_indices.shape[0]))

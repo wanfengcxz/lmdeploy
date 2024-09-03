@@ -434,4 +434,7 @@ DEVICE_SPECIAL_MODULE_MAP.update({'camb': CAMB_MODULE_MAP})
 CAMB_MODULE_MAP.update({
     'modeling_internlm2.InternLM2Attention':
     f'{LMDEPLOY_PYTORCH_MODEL_PATH}.internlm2.PatchedInternLM2AttentionCamb',
+    'modeling_internlm2.InternLM2FlashAttention2':
+    f'{LMDEPLOY_PYTORCH_MODEL_PATH}.internlm2.PatchedInternLM2AttentionCamb',
 })
+

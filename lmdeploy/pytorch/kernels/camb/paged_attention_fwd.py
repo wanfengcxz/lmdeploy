@@ -79,11 +79,15 @@ def paged_attention_fwd(
     #print("decode",is_decoding)
     #print("q_ptr",query_states.data_ptr())
     #print("attn_output",attn_output.data_ptr())
-
+    print(f"[attention, attn_input q]: {query_states[0, 0, 0:100:10].cpu()}  {query_states.abs().mean().cpu()}")
+    print(f"[attention, attn_input k]: {key_states[0, 0, 0:100:10].cpu()}  {key_states.abs().mean().cpu()}")
+    print(f"[attention, attn_input v]: {value_states[0, 0, 0:100:10].cpu()}  {value_states.abs().mean().cpu()}")
     totalSeq, head_num_q, head_size = query_states.shape[0],query_states.shape[1],query_states.shape[2]
     block_num,block_size,head_num_kv = key_cache.shape[0], key_cache.shape[1], key_cache.shape[2]
     k = key_cache.view(block_num, head_num_kv, block_size, head_size)
     v = value_cache.view(block_num, head_num_kv, block_size, head_size)
+    # k = key_cache.permute(0, 2, 1, 3).contiguous()
+    # v = value_cache.permute(0, 2, 1, 3).contiguous()
     kv_cache_len = block_num * block_size
     if not is_decoding:
         flash_context_attention(
@@ -101,6 +105,7 @@ def paged_attention_fwd(
             kv_cache_len,
             context=context,
         )
+        # print(f"[context_attention, attn_output]: {attn_output[0, 1, 0:100:10].cpu()}  {attn_output.abs().mean().cpu()}")
     else:
         paged_token_attention(
             query_states,
@@ -112,4 +117,4 @@ def paged_attention_fwd(
             block_offsets,
             block_size,
         )
-   
+        print(f"[paged_attention, attn_output]: {attn_output[0, 0, 0:100:10].cpu()}  {attn_output.abs().mean().cpu()}")
