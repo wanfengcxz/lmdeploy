@@ -7,7 +7,8 @@ import numpy as np
 from ...adapter.adapter import AdapterManager, SchedulerAdapter
 from ...messages import SchedulerSequence
 
-
+ # 逻辑内存 将cpu和gpu视作一整块内存，为这一整块逻辑内存分配元数据
+ # phy_map,ref_count,accesss_time记录每个逻辑块的信息
 class LogicalMemory:
     """Logical memory blocks."""
 
@@ -21,6 +22,7 @@ class LogicalMemory:
                                                 dtype=np.int64)
 
     def get_physical_blocks(self, logical_address: np.ndarray):
+        # 通过phy_map获取物理块的id
         """get physical address."""
         if isinstance(logical_address,
                       np.ndarray) and len(logical_address) == 0:
@@ -31,7 +33,7 @@ class LogicalMemory:
         """get num blocks."""
         return self._num_blocks
 
-
+# 物理内存，只是统计cpu和gpu内存的块数
 class PhysicalMemory:
     """physical memory blocks."""
 
@@ -48,7 +50,7 @@ class PhysicalMemory:
         """get num gpu blocks."""
         return self._num_gpu_blocks
 
-
+# 用来描述gpu/cpu内存块的使用情况
 class PhysicalAllocator:
     """The physical block allocator.
 
@@ -64,9 +66,11 @@ class PhysicalAllocator:
         self._num_blocks = num_blocks
         self._offset = offset
 
+        # 记录所有的空闲块index 类似一个栈 分配时从左边取出空闲块id，释放是从左边放入空闲块id
         self._free_blocks = np.arange(num_blocks, dtype=np.int64) + offset
         self._free_count = num_blocks
 
+    # 在左侧按顺序取出num_blocks个空闲块index
     def allocate(self, num_blocks: int):
         """Allocate block from block pool."""
         if self.get_num_free_blocks() >= num_blocks:
@@ -76,7 +80,8 @@ class PhysicalAllocator:
             return blocks
         else:
             raise MemoryError('No enough free memory blocks.')
-
+    
+    # 在左侧按顺序归还空闲块index
     def free(self, blocks: np.ndarray):
         """Free block to block pool."""
         freed_blocks = blocks
@@ -100,7 +105,9 @@ class LogicalAllocator:
         self._log_mem = LogicalMemory(num_cpu_blocks + num_gpu_blocks)
         self._phy_mem = PhysicalMemory(num_cpu_blocks, num_gpu_blocks)
 
-        self._cpu_mem_offset = num_gpu_blocks
+        self._cpu_mem_offset = num_gpu_blocks   # gpu内存块在前面 优先分配gpu内存块
+        
+        # 管理不同种类内存的空闲块
         self._gpu_allocator = PhysicalAllocator(self._phy_mem, num_gpu_blocks,
                                                 0)
         self._cpu_allocator = PhysicalAllocator(self._phy_mem, num_cpu_blocks,
@@ -108,7 +115,7 @@ class LogicalAllocator:
 
         num_blocks = self._log_mem.num_blocks()
         self._num_blocks = num_blocks
-        self._free_blocks = np.arange(num_blocks)
+        self._free_blocks = np.arange(num_blocks)   # 逻辑内存的空闲块
         self._free_count = num_blocks
 
     def get_phy_allocator(self, device: str):
@@ -127,10 +134,10 @@ class LogicalAllocator:
         phy_allocator = self.get_phy_allocator(device)
         logical_enable = self.get_num_free_blocks() >= num_blocks
         physical_enable = phy_allocator.get_num_free_blocks() >= num_blocks
-        if logical_enable and physical_enable:
+        if logical_enable and physical_enable:  # 逻辑块和物理块都充足
             num_used = self._num_blocks - self._free_count
-            blocks = self._free_blocks[num_used:num_used + num_blocks]
-            phy_blocks = phy_allocator.allocate(num_blocks)
+            blocks = self._free_blocks[num_used:num_used + num_blocks] # 从左边取出逻辑块index
+            phy_blocks = phy_allocator.allocate(num_blocks) # 从对应设备Allocator的左边取出物理块index
             self._log_mem.phy_map.put(blocks, phy_blocks)
             self._log_mem.ref_count.put(blocks, 1)
             self.update_access_time(blocks)
@@ -152,13 +159,13 @@ class LogicalAllocator:
 
         # free logical
         num_used = self._num_blocks - self._free_count
-        self._free_blocks[num_used - num_freed_blocks:num_used] = freed_blocks
+        self._free_blocks[num_used - num_freed_blocks:num_used] = freed_blocks  # 从左边归还逻辑块
         self._free_count += num_freed_blocks
 
         # free physical
-        phy_blocks = self.get_physical_blocks(freed_blocks)
+        phy_blocks = self.get_physical_blocks(freed_blocks) # 逻辑块index通过map来获取物理块index
 
-        cpu_blocks = phy_blocks[phy_blocks >= self._cpu_mem_offset]
+        cpu_blocks = phy_blocks[phy_blocks >= self._cpu_mem_offset] # 从左边归还物理块 此时要区分设备
         gpu_blocks = phy_blocks[phy_blocks < self._cpu_mem_offset]
         if len(cpu_blocks) > 0:
             self._cpu_allocator.free(cpu_blocks)

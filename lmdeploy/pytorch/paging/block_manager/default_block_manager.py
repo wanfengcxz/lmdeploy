@@ -25,6 +25,7 @@ class DefaultBlockManager(BaseBlockManager):
         num_cpu_blocks (int): number of cpu blocks.
     """
 
+    # 通过session中msg的token数量向上取整来分配block
     @classmethod
     def num_required_blocks(cls,
                             obj: Union[SchedulerSequence, SchedulerAdapter],
@@ -59,6 +60,7 @@ class DefaultBlockManager(BaseBlockManager):
             num_required_blocks += self.num_required_blocks(adapter)
         return num_required_blocks <= num_free_phy
 
+    # 分配的逻辑块id记录在msg.logical_blocks
     def allocate_msg(self, msg: SchedulerSequence, prealloc_size: int = 0):
         """Allocate physical blocks for given message according to logical
         blocks."""
@@ -80,6 +82,7 @@ class DefaultBlockManager(BaseBlockManager):
         self.allocator.free(msg.logical_blocks.get_real_blocks())
         msg.logical_blocks.reset()
 
+    # 将gpu块交换到cpu上面
     def try_swap_out(self, msg: Union[SchedulerSequence, SchedulerAdapter]):
         """Try swap msg out."""
         swap_map = dict()
@@ -129,6 +132,7 @@ class DefaultBlockManager(BaseBlockManager):
         else:
             return _do_swap()
 
+    # 将cpu块交换到gpu块
     def try_swap_in(self, msg: Union[SchedulerSequence, SchedulerAdapter]):
         """Try swap msg in."""
         swap_map = dict()
