@@ -41,5 +41,12 @@ class CAMBDeviceUtils(BaseDeviceUtils):
         is_unpaged_prefill = (not step_context.is_decoding) and all(
             (step_context.q_seq_length == step_context.kv_seq_length).tolist())
         setattr(step_context, 'is_unpaged_prefill', is_unpaged_prefill)
+
+        batch_size = step_context.q_start_loc.shape[0]
+        cu_seq_lens = torch.zeros(batch_size+1, dtype=torch.int32, device=step_context.block_offsets.device)
+        cu_seq_lens[:-1] = step_context.q_start_loc
+        cu_seq_lens[-1] = step_context.q_seq_length.sum()
+        setattr(step_context, 'cu_seq_lens', cu_seq_lens)
+
         return step_context
 

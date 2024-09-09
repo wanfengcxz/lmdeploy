@@ -33,6 +33,7 @@ def flash_context_attention(
             num_kv_heads,
             #attn_mask=context.attention_mask,
             attn_output = output,
+            cu_seq_lens = context.cu_seq_lens,
             #attn_output=attn_output.view(query_states.shape),
         )
     attn_output.copy_(output)
@@ -42,7 +43,7 @@ def paged_token_attention(q, k_cache, v_cache, attn_output, kv_seq_len,
 
     num_kv_heads, num_q_heads = k_cache.shape[1], q.shape[1]
     if q.ndim == 3:
-        q = q.unsqueeze(0)
+        q = q.unsqueeze(1)
 
     ext_ops.paged_decode_attention(
         q,
@@ -72,22 +73,10 @@ def paged_attention_fwd(
     window_size: int = 1,
     context=None,
 ):
-    is_decoding = 1 == query_states.size(0)
-    
-    #print("q",query_states.shape)
-    #print("q2",q_seqlens.shape)
-    #print("decode",is_decoding)
-    #print("q_ptr",query_states.data_ptr())
-    #print("attn_output",attn_output.data_ptr())
-    print(f"[attention, attn_input q]: {query_states[0, 0, 0:100:10].cpu()}  {query_states.abs().mean().cpu()}")
-    print(f"[attention, attn_input k]: {key_states[0, 0, 0:100:10].cpu()}  {key_states.abs().mean().cpu()}")
-    print(f"[attention, attn_input v]: {value_states[0, 0, 0:100:10].cpu()}  {value_states.abs().mean().cpu()}")
-    totalSeq, head_num_q, head_size = query_states.shape[0],query_states.shape[1],query_states.shape[2]
-    block_num,block_size,head_num_kv = key_cache.shape[0], key_cache.shape[1], key_cache.shape[2]
-    k = key_cache.view(block_num, head_num_kv, block_size, head_size)
-    v = value_cache.view(block_num, head_num_kv, block_size, head_size)
-    # k = key_cache.permute(0, 2, 1, 3).contiguous()
-    # v = value_cache.permute(0, 2, 1, 3).contiguous()
+    is_decoding = query_states.shape[-3] == q_seqlens.size(0) 
+    block_num, block_size, head_num, head_size = key_cache.size()
+    k = key_cache.view(block_num, head_num, block_size, head_size)
+    v = value_cache.view(block_num, head_num, block_size, head_size)
     kv_cache_len = block_num * block_size
     if not is_decoding:
         flash_context_attention(
@@ -105,7 +94,7 @@ def paged_attention_fwd(
             kv_cache_len,
             context=context,
         )
-        # print(f"[context_attention, attn_output]: {attn_output[0, 1, 0:100:10].cpu()}  {attn_output.abs().mean().cpu()}")
+       
     else:
         paged_token_attention(
             query_states,
@@ -117,4 +106,4 @@ def paged_attention_fwd(
             block_offsets,
             block_size,
         )
-        print(f"[paged_attention, attn_output]: {attn_output[0, 0, 0:100:10].cpu()}  {attn_output.abs().mean().cpu()}")
+      
