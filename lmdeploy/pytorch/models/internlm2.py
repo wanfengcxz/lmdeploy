@@ -607,7 +607,7 @@ class PatchedInternLM2Model(nn.Module):
             record_shapes=True,
             # profile_memory=True,
             with_stack=True,
-            on_trace_ready=torch.profiler.tensorboard_trace_handler("./trace_log1")
+            on_trace_ready=torch.profiler.tensorboard_trace_handler("./trace_log0909")
         ) as prof:
             print(position_ids.shape) 
             ret = self._continuous_batching_forward(
@@ -620,13 +620,13 @@ class PatchedInternLM2Model(nn.Module):
                 output_attentions,
             )
         import sys
-        print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=5))
+        #print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=5))
         #prof.export_chrome_trace("trace.json")
         if position_ids.shape[-1] != 1:
             print("prefill")
             #prof.export_chrome_trace("trace_internlm2_chat_mlu_prefill.json")
             #prof.export_chrome_trace("trace.json")
-            print("success")
+            #print("success")
             #sys.exit()
         else:
             print("decoder")
