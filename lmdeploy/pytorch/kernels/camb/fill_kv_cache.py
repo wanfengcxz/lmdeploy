@@ -15,11 +15,4 @@ def fill_kv_cache(
     context: None,
 ):    
     """fill key/value state to cache for paged attention."""
-   
-    block_num, block_size, head_num, head_dim = key_caches.shape    # torch.Size([1644, 64, 8, 128])
-    
-    key_cache_reshaped = key_caches.view(key_caches.shape[0],key_caches.shape[2],key_caches.shape[1],key_caches.shape[3])
-    value_cache_reshaped = value_caches.view(value_caches.shape[0],value_caches.shape[2],value_caches.shape[1],value_caches.shape[3])
-    ext_ops.fill_kv_cache(key_states, value_states, key_cache_reshaped, value_cache_reshaped, context.kv_start_indices.view(context.kv_start_indices.shape[0]))
-
-
+    ext_ops.fill_kv_cache(key_states, value_states, key_caches, value_caches, context.kv_start_indices)
