@@ -47,6 +47,6 @@ class CAMBDeviceUtils(BaseDeviceUtils):
         cu_seq_lens[:-1] = step_context.q_start_loc
         cu_seq_lens[-1] = step_context.q_seq_length.sum()
         setattr(step_context, 'cu_seq_lens', cu_seq_lens)
-
+        setattr(step_context, 'kv_seq_length', step_context.kv_seq_length.to(torch.int32))
         return step_context
 

@@ -31,4 +31,5 @@ def apply_rotary_pos_emb(
         k_embed = key_states
     else:
         k_embed.copy_(key_states)
-    return q_embed, k_embed
+    return query_states, key_states
+    #return q_embed, k_embed

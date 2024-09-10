@@ -34,6 +34,7 @@ def flash_context_attention(
             #attn_mask=context.attention_mask,
             attn_output = output,
             cu_seq_lens = context.cu_seq_lens,
+            max_seq_len = context.max_kv_seq_length,
             #attn_output=attn_output.view(query_states.shape),
         )
     attn_output.copy_(output)
@@ -54,7 +55,8 @@ def paged_token_attention(q, k_cache, v_cache, attn_output, kv_seq_len,
         kv_seq_len,
         num_q_heads,
         num_kv_heads,
-        attn_output=attn_output.view(q.shape),
+        attn_output = attn_output.view(q.shape),
+        max_context_lens = max_kv_seq_len,
     )
 
 
