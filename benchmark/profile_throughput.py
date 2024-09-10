@@ -5,6 +5,10 @@ import json
 import os
 import random
 import time
+
+import infer_ext
+import lmdeploy
+
 from queue import Queue
 from threading import Thread
 from typing import List, Tuple, Union
@@ -324,9 +328,11 @@ def main():
         engine_config = PytorchEngineConfig(
             session_len=args.session_len,
             cache_max_entry_count=args.cache_max_entry_count,
-            block_size=args.cache_block_seq_len,
+            #block_size=args.cache_block_seq_len,
+            block_size=16,
             max_batch_size=args.concurrency,
             tp=args.tp,
+            device_type='camb',
             thread_safe=True,
             enable_prefix_caching=args.enable_prefix_caching,
         )

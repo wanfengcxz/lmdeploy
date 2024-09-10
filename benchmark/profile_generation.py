@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from queue import Queue
 from threading import Thread
 from typing import List, Union
+import infer_ext
+import lmdeploy
+import torch
+import torch_mlu
 
 import numpy as np
 from pynvml import (NVMLError, nvmlDeviceGetCount, nvmlDeviceGetHandleByIndex,
@@ -418,7 +422,9 @@ def main():
             elif args.backend == 'pytorch':
                 engine_config = PytorchEngineConfig(
                     cache_max_entry_count=args.cache_max_entry_count,
-                    block_size=args.cache_block_seq_len,
+                    #block_size=args.cache_block_seq_len,
+                    block_size=16,
+                    device_type='camb',
                     session_len=session_len,
                     tp=args.tp,
                     thread_safe=True,
@@ -454,34 +460,34 @@ def main():
                               output_throughput=output_throughput,
                               total_throughput=total_throughput,
                               mem_per_gpu=memory / tp))
-    if args.csv:
-        with open(args.csv, 'w') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow([
-                'batch',
-                'prompt_tokens',
-                'completion_tokens',
-                'throughput(total tok/s)',
-                'throughput(out tok/s)',
-                'mem(GB)',
-                'FTL(ave)(s)',
-                'FTL(min)(s)',
-                'FTL(max)(s)',
-                '50%(s)',
-                '75%(s)',
-                '95%(s)',
-                '99%(s)',
-            ])
-            for re in results:
+   
+        if args.csv:
+            with open(args.csv, 'w') as csvfile:
+                writer = csv.writer(csvfile)
                 writer.writerow([
-                    re.batch, re.prompt_tokens, re.completion_tokens,
-                    f'{re.total_throughput:.2f}',
-                    f'{re.output_throughput:.2f}', f'{re.mem_per_gpu:.2f}',
-                    re.first_token_latency[2], re.first_token_latency[0],
-                    re.first_token_latency[1], re.percentiles[0],
-                    re.percentiles[1], re.percentiles[2], re.percentiles[3]
+                    'batch',
+                    'prompt_tokens',
+                    'completion_tokens',
+                    'throughput(total tok/s)',
+                    'throughput(out tok/s)',
+                    'mem(GB)',
+                    'FTL(ave)(s)',
+                    'FTL(min)(s)',
+                    'FTL(max)(s)',
+                    '50%(s)',
+                    '75%(s)',
+                    '95%(s)',
+                    '99%(s)',
                 ])
-
-
+                for re in results:
+                    writer.writerow([
+                        re.batch, re.prompt_tokens, re.completion_tokens,
+                        f'{re.total_throughput:.2f}',
+                        f'{re.output_throughput:.2f}', f'{re.mem_per_gpu:.2f}',
+                        re.first_token_latency[2], re.first_token_latency[0],
+                        re.first_token_latency[1], re.percentiles[0],
+                        re.percentiles[1], re.percentiles[2], re.percentiles[3]
+                    ])
 if __name__ == '__main__':
     main()
+    
