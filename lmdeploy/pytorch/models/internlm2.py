@@ -607,7 +607,7 @@ class PatchedInternLM2Model(nn.Module):
             record_shapes=True,
             # profile_memory=True,
             with_stack=True,
-            on_trace_ready=torch.profiler.tensorboard_trace_handler("./trace_log0909")
+            on_trace_ready=torch.profiler.tensorboard_trace_handler("./trace_log0910")
         ) as prof:
             print(position_ids.shape) 
             ret = self._continuous_batching_forward(
