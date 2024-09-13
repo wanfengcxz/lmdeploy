@@ -9,10 +9,30 @@ class CAMBDeviceUtils(BaseDeviceUtils):
     device = 'camb'
 
     @classmethod
+    def update_kv_caches_shape(cls, kv_caches):
+        _, block_size, head_num, head_size = kv_caches[0][0].shape
+        reshaped_kv_caches = [
+                [cache.view(-1, head_num, block_size, head_size) for cache in kv]
+                    for kv in kv_caches
+            ]
+        return reshaped_kv_caches
+
+    @classmethod
     def update_step_context(cls, step_context):
         """update step context."""
         kv_start_indices, attention_mask = [], []
-        _, block_size, _, _ = step_context.kv_caches[0][0].shape
+        
+        is_unpaged_prefill = (not step_context.is_decoding) and all(
+            (step_context.q_seq_length == step_context.kv_seq_length).tolist())
+        setattr(step_context, 'is_unpaged_prefill', is_unpaged_prefill)
+
+        # 在prefill阶段reshape kv_caches
+        #if is_unpaged_prefill:
+            #reshaped_kv_caches = cls.update_kv_caches_shape(step_context.kv_caches)
+            #setattr(step_context, 'kv_caches', reshaped_kv_caches)
+        #print(step_context.kv_caches[0][0].shape)
+        
+        _, _, block_size, _ = step_context.kv_caches[0][0].shape
         for i in range(step_context.q_start_loc.size(0)):
             single_attention_mask = torch.logical_not(
                 torch.tril(
@@ -38,9 +58,6 @@ class CAMBDeviceUtils(BaseDeviceUtils):
             kv_start_indices, device=step_context.block_offsets.device)
         setattr(step_context, 'kv_start_indices', kv_start_indices)
         setattr(step_context, 'attention_mask', attention_mask)
-        is_unpaged_prefill = (not step_context.is_decoding) and all(
-            (step_context.q_seq_length == step_context.kv_seq_length).tolist())
-        setattr(step_context, 'is_unpaged_prefill', is_unpaged_prefill)
 
         batch_size = step_context.q_start_loc.shape[0]
         cu_seq_lens = torch.zeros(batch_size+1, dtype=torch.int32, device=step_context.block_offsets.device)

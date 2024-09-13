@@ -77,8 +77,10 @@ def paged_attention_fwd(
 ):
     is_decoding = query_states.shape[-3] == q_seqlens.size(0) 
     block_num, block_size, head_num, head_size = key_cache.size()
-    k = key_cache.view(block_num, head_num, block_size, head_size)
-    v = value_cache.view(block_num, head_num, block_size, head_size)
+    #k = key_cache.view(block_num, head_num, block_size, head_size)
+    #v = value_cache.view(block_num, head_num, block_size, head_size)
+    k = key_cache
+    v = value_cache
     kv_cache_len = block_num * block_size
     if not is_decoding:
         flash_context_attention(
