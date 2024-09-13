@@ -90,7 +90,8 @@ class CacheEngine:
             assert num_heads % world_size == 0, \
                 f'num_heads: {num_heads}, world_size: {world_size}'
             num_heads = num_heads // world_size
-        return (block_size, num_heads, head_size)
+        #return (block_size, num_heads, head_size)
+        return (num_heads, block_size, head_size)
 
     def get_key_block_shape(self, local: bool = False) -> Tuple[int, int, int]:
         """get shape of key block."""
