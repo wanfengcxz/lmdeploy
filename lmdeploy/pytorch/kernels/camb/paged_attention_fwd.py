@@ -45,6 +45,7 @@ def paged_token_attention(q, k_cache, v_cache, attn_output, kv_seq_len,
     num_kv_heads, num_q_heads = k_cache.shape[1], q.shape[1]
     if q.ndim == 3:
         q = q.unsqueeze(1)
+    attn_output = attn_output.view(q.shape)
 
     ext_ops.paged_decode_attention(
         q,
@@ -55,7 +56,7 @@ def paged_token_attention(q, k_cache, v_cache, attn_output, kv_seq_len,
         kv_seq_len,
         num_q_heads,
         num_kv_heads,
-        attn_output = attn_output.view(q.shape),
+        attn_output = attn_output,
         max_context_lens = max_kv_seq_len,
     )
 
@@ -75,7 +76,7 @@ def paged_attention_fwd(
     window_size: int = 1,
     context=None,
 ):
-    is_decoding = query_states.shape[-3] == q_seqlens.size(0) 
+    is_decoding = query_states.shape[-3] == q_seqlens.shape[0] 
     block_num, block_size, head_num, head_size = key_cache.size()
     #k = key_cache.view(block_num, head_num, block_size, head_size)
     #v = value_cache.view(block_num, head_num, block_size, head_size)

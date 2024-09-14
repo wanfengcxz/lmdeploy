@@ -23,11 +23,11 @@ def apply_rotary_pos_emb(
             setattr(context, 'sin', sin)
     
     query_states, key_states = ext_ops.apply_rotary_pos_emb(query_states, key_states, None, None, position_ids_1d, cos, sin, cu_seq_lens)
-    if q_embed is None:
+    if q_embed is None or q_embed.data_ptr() == query_states.data_ptr():
         q_embed = query_states
     else:
         q_embed.copy_(query_states)
-    if k_embed is None:
+    if k_embed is None or k_embed.data_ptr() == key_states.data_ptr():
         k_embed = key_states
     else:
         k_embed.copy_(key_states)
