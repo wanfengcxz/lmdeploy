@@ -599,12 +599,24 @@ class PatchedInternLM2Model(nn.Module):
         **kwargs,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         """Rewrite of LlamaModel.forward."""
-        return self._continuous_batching_forward(
-            input_ids,
-            attention_mask,
-            position_ids,
-            past_key_values,
-            inputs_embeds,
-            use_cache,
-            output_attentions,
-        )
+        with torch.profiler.profile(activities=[
+            torch.profiler.ProfilerActivity.CPU,
+            torch.profiler.ProfilerActivity.MLU,],
+            on_trace_ready=torch.profiler.tensorboard_trace_handler("./trace_log0918")
+        ) as prof:
+            print(position_ids.shape)
+            ret = self._continuous_batching_forward(
+                input_ids,
+                attention_mask,
+                position_ids,
+                past_key_values,
+                inputs_embeds,
+                use_cache,
+                output_attentions,
+            )
+        import sys
+        if position_ids.shape[-1] != 1:
+            print("prefill")
+        else:
+            print("decoder")
+        return ret
