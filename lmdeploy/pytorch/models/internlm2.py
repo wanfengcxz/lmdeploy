@@ -403,7 +403,7 @@ class PatchedInternLM2AttentionCamb(nn.Module):
             query_states = qkv_states[..., :self.num_key_value_groups, :]
             query_states = query_states.flatten(1, 2)
             key_states = qkv_states[..., -2, :].contiguous()
-            value_states = qkv_states[..., -1, :]
+            value_states = qkv_states[..., -1, :].contiguous()
             return query_states, key_states, value_states
 
         def __rotary_emb_fn(query_states, key_states, value_states):
