@@ -396,7 +396,7 @@ class PatchedInternLM2AttentionCamb(nn.Module):
             qkv_states = self.wqkv(hidden_states)
             qkv_states = rearrange(
                 qkv_states,
-                'b q (h gs d) -> (b q) h gs d',
+                'q (h gs d) -> (q) h gs d',
                 gs=2 + self.num_key_value_groups,
                 d=self.head_dim,
             )
@@ -404,6 +404,21 @@ class PatchedInternLM2AttentionCamb(nn.Module):
             query_states = query_states.flatten(1, 2)
             key_states = qkv_states[..., -2, :].contiguous()
             value_states = qkv_states[..., -1, :].contiguous()
+            return query_states, key_states, value_states
+
+        def __qkv_proj2(hidden_states):
+            """qkv_proj."""
+            qkv_states = self.wqkv(hidden_states)
+            
+            seq_len = qkv_states.shape[0]
+            qkv_states = qkv_states.reshape(seq_len, -1, self.head_dim)
+            
+            step = (2 + self.num_key_value_groups)
+            value_states = qkv_states[..., self.num_key_value_groups+1::step, :].contiguous()
+            
+            #print(value_states.shape)
+            query_states = qkv_states
+            key_states = None
             return query_states, key_states, value_states
 
         def __rotary_emb_fn(query_states, key_states, value_states):
@@ -448,9 +463,55 @@ class PatchedInternLM2AttentionCamb(nn.Module):
             )
             return query_states, key_states, value_states
 
-        query_states, key_states, value_states = __qkv_proj(hidden_states)
+        def __rotary_emb_fn2(query_states, key_states, value_states):
+            """rotary embedding func."""
+            # compat
+            if not hasattr(self, '_use_old_rotary_emb'):
+                import inspect
 
-        query_states, key_states, value_states = __rotary_emb_fn(
+                args = inspect.getargspec(self.rotary_emb.forward)[0]
+                self._use_old_rotary_emb = 'seq_len' in args
+
+            if not hasattr(context, '_cos'):
+                if self._use_old_rotary_emb:
+                    kwargs = dict(seq_len=max_kv_seq_length)
+                else:
+                    kwargs = dict(position_ids=position_ids_1d[None])
+
+                cos, sin = self.rotary_emb(value_states.transpose(0, 1),
+                                           **kwargs)
+                context._cos = cos
+                context._sin = sin
+            else:
+                cos = context._cos
+                sin = context._sin
+
+            if self._use_old_rotary_emb:
+                _position_ids_1d = position_ids_1d
+            else:
+                _position_ids_1d = torch.arange(0,
+                                                len(position_ids_1d),
+                                                device=query_states.device)
+            qk, key_states = apply_rotary_pos_emb(
+                query_states,
+                key_states,
+                cos,
+                sin,
+                position_ids,
+                position_ids_1d=_position_ids_1d,
+                q_embed=query_states,
+                k_embed=key_states,
+                context=context,
+            )
+            seq_len = qk.shape[0]
+            qk = qk.view(seq_len, -1, 2 + self.num_key_value_groups, self.head_dim)
+            query_states = qk[..., :self.num_key_value_groups, :].flatten(1, 2)
+            key_states = qk[..., -2, :].contiguous()
+            return query_states, key_states, value_states
+        
+        query_states, key_states, value_states = __qkv_proj2(hidden_states)
+
+        query_states, key_states, value_states = __rotary_emb_fn2(
             query_states, key_states, value_states)
 
         fill_kv_cache(
@@ -481,7 +542,7 @@ class PatchedInternLM2AttentionCamb(nn.Module):
             max_seqlen=max_q_seq_length,
             context=context,
         )
-        attn_output = attn_output.reshape(*hidden_states.shape[:-1], -1)
+        attn_output = attn_output.view(hidden_states.shape[0], -1)
 
         attn_output = self.wo(attn_output)
 
@@ -562,7 +623,7 @@ class PatchedInternLM2Model(nn.Module):
 
         # Attention mask is not necessary in continuous batching
         attention_mask = None
-        hidden_states = inputs_embeds
+        hidden_states = inputs_embeds.squeeze()
 
         # decoder layers
         for idx, decoder_layer in enumerate(self.layers):
@@ -578,7 +639,7 @@ class PatchedInternLM2Model(nn.Module):
             )
             hidden_states = layer_outputs[0]
 
-        hidden_states = self.norm(hidden_states)
+        hidden_states = self.norm(hidden_states).unsqueeze(0)
 
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
