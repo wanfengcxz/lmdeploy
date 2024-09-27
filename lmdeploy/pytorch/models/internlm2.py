@@ -396,7 +396,7 @@ class PatchedInternLM2AttentionCamb(nn.Module):
             qkv_states = self.wqkv(hidden_states)
             qkv_states = rearrange(
                 qkv_states,
-                'b q (h gs d) -> (b q) h gs d',
+                'q (h gs d) -> (q) h gs d',
                 gs=2 + self.num_key_value_groups,
                 d=self.head_dim,
             )
@@ -481,7 +481,7 @@ class PatchedInternLM2AttentionCamb(nn.Module):
             max_seqlen=max_q_seq_length,
             context=context,
         )
-        attn_output = attn_output.reshape(*hidden_states.shape[:-1], -1)
+        attn_output = attn_output.view(hidden_states.shape[0], -1)
 
         attn_output = self.wo(attn_output)
 
@@ -562,7 +562,7 @@ class PatchedInternLM2Model(nn.Module):
 
         # Attention mask is not necessary in continuous batching
         attention_mask = None
-        hidden_states = inputs_embeds
+        hidden_states = inputs_embeds.squeeze()
 
         # decoder layers
         for idx, decoder_layer in enumerate(self.layers):
@@ -578,7 +578,7 @@ class PatchedInternLM2Model(nn.Module):
             )
             hidden_states = layer_outputs[0]
 
-        hidden_states = self.norm(hidden_states)
+        hidden_states = self.norm(hidden_states).unsqueeze(0)
 
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
