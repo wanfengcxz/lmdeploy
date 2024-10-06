@@ -80,6 +80,7 @@ class InternLM2Attention(nn.Module):
             key_states,
             cos,
             sin,
+            attn_metadata,
             inplace=True,
         )
 
