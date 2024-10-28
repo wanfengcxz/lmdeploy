@@ -13,7 +13,7 @@ def apply_rotary_pos_emb(
 ):
     query_states = query_states.contiguous()
     key_states = key_states.contiguous()
-    query_states, key_states = ext_ops.apply_rotary_pos_emb(query_states, key_states, cos, sin, None)
+    query_states, key_states = ext_ops.apply_rotary_pos_emb(query_states, key_states, cos, sin, None, None)
 
     if q_embed is None:
         q_embed = query_states
