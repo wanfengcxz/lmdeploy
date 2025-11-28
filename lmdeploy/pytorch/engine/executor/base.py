@@ -253,8 +253,8 @@ class ExecutorBase:
             if spec_cache_config := self.specdecode_config.cache_config:
                 logger.info(f'Building Spec CacheEngine with config: \n{spec_cache_config}.')
         self.build_cache_engine()
-        # logger.info('Warming up model.')
-        # self.warmup()
+        logger.info('Warming up model.')
+        self.warmup()
 
     @contextlib.contextmanager
     def remote_log(self, msg: str):
