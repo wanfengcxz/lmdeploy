@@ -5,7 +5,6 @@ import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Tuple
-from lmdeploy.pytorch.kernels.triton_ops.fla.triton_utils import init_device_properties_triton
 
 import torch
 
@@ -269,7 +268,6 @@ class AscendOpsBackend(DlinferOpsBackend):
             has_initial_state=has_initial_state,
         )
 
-        init_device_properties_triton()
         step_context.attn_metadata = attn_metadata
         return step_context
 
@@ -287,6 +285,8 @@ class AscendOpsBackend(DlinferOpsBackend):
         """Initialize Ascend backend."""
         try:
             from torch_npu.contrib import transfer_to_npu  # noqa: F401
+            from dlinfer.vendor.ascend.triton_ops.fla.triton_utils import init_device_properties_triton
+            init_device_properties_triton()
         except ImportError:
             logger.warning('Failed to import torch_npu. Please make sure torch_npu is installed correctly. '
                            'Ascend initialization skipped.')
