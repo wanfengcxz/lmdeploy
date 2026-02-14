@@ -1086,3 +1086,4 @@ class Qwen3NextForCausalLM(nn.Module, CudaGraphMixin):
                             break
                     param = params_dict[name]
                     load_weight(param, loaded_weight)
+
