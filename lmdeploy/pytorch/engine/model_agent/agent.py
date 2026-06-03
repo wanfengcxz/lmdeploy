@@ -440,15 +440,32 @@ class BaseModelAgent:
         self,
         inputs: ModelInputs,
         return_logits: bool,
+        pre_dp_is_decoding: bool | None = None,
     ):
         """Model forward."""
         origin_inputs = inputs
         ret = await self.async_forward(inputs)
 
-        if not return_logits:
+        # When spec decode is active, update_main_model_outputs handles the hidden state
+        # slicing (prefill: logits_indices; decoding: all positions preserved for rejection
+        # sampling). Calling _postprocess_forward_output here would reduce the decoding
+        # hidden states to only the last token per sequence, leaving target_logits with
+        # batch_size rows instead of batch_size*(num_spec_tokens+1), causing a shape
+        # mismatch in _rejection_sampling when expanded_sampling_inputs is 5x larger.
+        if not return_logits and not self.spec_agent.is_enabled():
             ret = self._postprocess_forward_output(ret, origin_inputs)
 
-        hidden_states, ret = self.spec_agent.update_main_model_outputs(ret, origin_inputs)
+        # In DP mode, _prepare_dp_v1 sets is_decoding=False on all ranks when any rank is
+        # prefilling, but update_main_model_outputs needs the per-rank original is_decoding
+        # to avoid incorrectly applying prefill slicing on spec-decode verification steps.
+        # Temporarily restore the pre-DP-sync value for the slicing decision only.
+        if pre_dp_is_decoding is not None and pre_dp_is_decoding != origin_inputs.is_decoding:
+            dp_synced_is_decoding = origin_inputs.is_decoding
+            origin_inputs.is_decoding = pre_dp_is_decoding
+            hidden_states, ret = self.spec_agent.update_main_model_outputs(ret, origin_inputs)
+            origin_inputs.is_decoding = dp_synced_is_decoding
+        else:
+            hidden_states, ret = self.spec_agent.update_main_model_outputs(ret, origin_inputs)
 
         logits = self.get_logits(hidden_states)
         ret['logits'] = logits
@@ -739,6 +756,7 @@ class BaseModelAgent:
         output = await self._async_model_forward(
             inputs,
             return_logits=return_logits,
+            pre_dp_is_decoding=is_decoding if dp > 1 else None,
         )
         # recovery is_decoding
         inputs.is_decoding = is_decoding
