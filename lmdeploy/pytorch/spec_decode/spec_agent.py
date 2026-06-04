@@ -447,6 +447,10 @@ class SpecModelAgent(BaseSpecModelAgent):
     def _forward_impl(self, inputs: ModelInputs):
         """Forward impl."""
         with self.draft_context():
+            draft_dist_config = self.draft_dist_ctx.dist_config
+            if draft_dist_config.dp > 1 and inputs.dp_meta is None:
+                num_tokens = inputs.input_ids.numel()
+                inputs.build_dp_meta([num_tokens] * draft_dist_config.world_size)
             output = self.proposer._forward(inputs, cache_engine=self.cache_engine)
         return output
 
