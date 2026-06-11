@@ -139,6 +139,13 @@ with set_envs():
     # check env
     enable_check_env = env_to_bool('LMDEPLOY_ENABLE_CHECK_ENV', True)
 
+    # hccl / ascend — passed to ray workers the same way as dlblas vars below
+    os.getenv('HCCL_BUFFSIZE', None)
+    os.getenv('HCCL_CONNECT_TIMEOUT', None)
+    os.getenv('HCCL_OP_EXPANSION_MODE', None)
+    os.getenv('HCCL_IF_IP', None)
+    os.getenv('PYTORCH_NPU_ALLOC_CONF', None)
+
     # dlblas
     # we don't need to read this, it would be passed to ray workers
     # If Ray is launched from outside, it may fail to access the environment variables.
