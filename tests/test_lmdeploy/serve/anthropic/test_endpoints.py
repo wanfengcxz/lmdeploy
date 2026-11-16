@@ -1527,8 +1527,6 @@ def test_count_tokens_keeps_assistant_tool_calls_structured():
     assistant message with tool_use blocks (and no thinking text) used to be
     rejected by deepseek-style templates -- the count path flattened the blocks
     into ``[tool_use ...]`` text and dropped ``tool_calls``."""
-    import json
-
     from lmdeploy.model import DeepseekV32ChatTemplate
     from lmdeploy.serve.anthropic.adapter import to_lmdeploy_messages
 
@@ -1551,5 +1549,45 @@ def test_count_tokens_keeps_assistant_tool_calls_structured():
     lm_messages = to_lmdeploy_messages(CountTokensRequest(model='fake-model', messages=messages))
     (tool_call, ) = lm_messages[-1]['tool_calls']
     assert tool_call['function']['name'] == 'get_weather'
-    assert json.loads(tool_call['function']['arguments']) == {'city': 'Beijing'}
+    assert tool_call['function']['arguments'] == {'city': 'Beijing'}
     assert lm_messages[-1]['content'] == 'checking'
+
+
+@pytest.mark.parametrize('thinking_type', [None, 'disabled', 'enabled', 'adaptive'])
+@pytest.mark.parametrize('with_tool_result', [False, True])
+def test_http_count_tokens_renders_glm_tool_arguments(hf_media_template, monkeypatch, thinking_type, with_tool_result):
+    """GLM must render object arguments even with thinking disabled."""
+    context = _FakeServerContext(chat_template=hf_media_template('glm5_3_flash'))
+    prompts = []
+    original_encode = context.async_engine.tokenizer.encode
+
+    def capture_prompt(prompt, **kwargs):
+        prompts.append(prompt)
+        return original_encode(prompt, **kwargs)
+
+    monkeypatch.setattr(context.async_engine.tokenizer, 'encode', capture_prompt)
+    messages = [
+        {'role': 'user', 'content': 'weather?'},
+        {'role': 'assistant', 'content': [
+            {'type': 'tool_use', 'id': 't1', 'name': 'get_weather', 'input': {'city': 'Beijing', 'days': 2}},
+        ]},
+    ]
+    if with_tool_result:
+        messages.append({'role': 'user', 'content': [
+            {'type': 'tool_result', 'tool_use_id': 't1', 'content': 'Sunny'},
+        ]})
+    payload = _count_tokens_payload(messages=messages)
+    if thinking_type is not None:
+        payload['thinking'] = {'type': thinking_type}
+    app = FastAPI()
+    app.include_router(create_anthropic_router(context))
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post('/v1/messages/count_tokens', headers=ANTHROPIC_HEADERS, json=payload)
+
+    assert response.status_code == 200, response.text
+    prompt, = prompts
+    assert '<tool_call>get_weather' in prompt
+    assert '<arg_key>city</arg_key><arg_value>Beijing</arg_value>' in prompt
+    assert '<arg_key>days</arg_key><arg_value>2</arg_value>' in prompt
+    assert response.json()['input_tokens'] == len(original_encode(prompt, add_bos=True))
