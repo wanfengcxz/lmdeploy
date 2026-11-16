@@ -204,19 +204,23 @@ def _reasoning_from_blocks(blocks: list[ContentBlockParam | dict[str, Any]]) -> 
 
 
 def _tool_calls_from_blocks(blocks: list[ContentBlockParam | dict[str, Any]]) -> list[dict[str, Any]] | None:
-    """Build OpenAI-style tool calls from ``tool_use`` blocks, mirroring the
-    generation path."""
+    """Build template-ready tool calls from ``tool_use`` blocks."""
 
     tool_calls = []
     for block in blocks:
         if _block_get(block, 'type') == 'tool_use':
+            # Generation normalizes JSON object arguments before rendering.
+            # The count path renders directly, so keep object inputs as dicts.
+            arguments = _block_get(block, 'input') or {}
+            if not isinstance(arguments, dict):
+                arguments = json.dumps(arguments)
             tool_calls.append(
                 dict(
                     id=_block_get(block, 'id') or f'call_{shortuuid.random()}',
                     type='function',
                     function=dict(
                         name=_block_get(block, 'name') or '',
-                        arguments=json.dumps(_block_get(block, 'input') or {}),
+                        arguments=arguments,
                     ),
                 ))
     return tool_calls or None
